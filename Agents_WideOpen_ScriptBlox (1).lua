@@ -547,7 +547,7 @@ gui.Destroying:Connect(function()
     Lighting.GlobalShadows = originalShadows
 end)
 
-openPage("Home")
+-- Keep the Performance page open so the sliders are visible on startup.
 
 -- Startup indicator: confirms the GUI was created successfully.
 local startupToast = new("TextLabel", {
