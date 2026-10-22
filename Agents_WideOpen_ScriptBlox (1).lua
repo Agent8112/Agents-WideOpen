@@ -95,6 +95,8 @@ end
 local gui = new("ScreenGui", {
     Name = "AgentsWideOpen",
     ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    DisplayOrder = 999,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 }, playerGui)
 
@@ -436,8 +438,23 @@ track(RunService.RenderStepped:Connect(function(dt)
     end
 end))
 
+local minimized = false
+local expandedSize = main.Size
+local function setMinimized(state)
+    minimized = state
+    main.Size = minimized and UDim2.fromOffset(660, 76) or expandedSize
+    sidebar.Visible = not minimized
+    body.Visible = not minimized
+    closeButton.Text = minimized and "+" or "×"
+end
+
 track(closeButton.Activated:Connect(function()
-    gui:Destroy()
+    setMinimized(not minimized)
+end))
+track(UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightShift and gui.Parent then
+        setMinimized(not minimized)
+    end
 end))
 
 gui.Destroying:Connect(function()
@@ -451,9 +468,20 @@ end)
 
 openPage("Home")
 
-
--- Diagnostic note:
--- This UI is designed for a Roblox LocalScript in a game you own/control.
--- If run from an executor, services or UI input behavior may differ. Check the
--- executor console for the first error line; the UI cannot control a third-party
--- game's bike physics without an authorized vehicle-tuning interface.
+-- Startup indicator: confirms the GUI was created successfully.
+local startupToast = new("TextLabel", {
+    Name = "AgentsStartupToast",
+    Size = UDim2.fromOffset(250, 32),
+    Position = UDim2.new(1, -262, 0, 12),
+    BackgroundColor3 = C.dark,
+    Text = "✦ Agents WideOpen loaded",
+    TextColor3 = C.bright,
+    TextSize = 12,
+    Font = Enum.Font.GothamSemibold,
+    ZIndex = 20,
+}, gui)
+corner(startupToast, 8)
+stroke(startupToast, C.purple, 0, 1)
+task.delay(3, function()
+    if startupToast and startupToast.Parent then startupToast:Destroy() end
+end)
