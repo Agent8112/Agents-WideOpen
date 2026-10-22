@@ -64,7 +64,55 @@ close.TextColor3 = white
 close.BackgroundColor3 = panelPurple
 close.Parent = main
 Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
-close.MouseButton1Click:Connect(function() gui.Enabled = false end)
+local minimized = false
+local expandedSize = main.Size
+local minimizedSize = UDim2.fromOffset(520, 58)
+
+local function setMinimized(state)
+    minimized = state
+    main.Size = minimized and minimizedSize or expandedSize
+    tabs.Visible = not minimized
+    content.Visible = not minimized
+    note.Visible = not minimized
+    close.Text = minimized and "+" or "×"
+end
+
+close.MouseButton1Click:Connect(function()
+    setMinimized(not minimized)
+end)
+
+-- Drag the window by holding the title bar.
+local dragging = false
+local dragStart
+local startPosition
+
+title.Active = true
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPosition = main.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(
+            startPosition.X.Scale, startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale, startPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
 
 local tabs = Instance.new("Frame")
 tabs.Size = UDim2.new(1, -28, 0, 38)
@@ -284,9 +332,9 @@ performanceTab.Activated:Connect(renderPerformance)
 visualTab.Activated:Connect(renderVisuals)
 renderPerformance()
 
--- RightShift toggles the menu after it has been created.
+-- RightShift minimizes/restores the menu.
 UserInputService.InputBegan:Connect(function(input, processed)
     if not processed and input.KeyCode == Enum.KeyCode.RightShift then
-        gui.Enabled = not gui.Enabled
+        setMinimized(not minimized)
     end
 end)
