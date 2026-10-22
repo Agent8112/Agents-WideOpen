@@ -1,452 +1,258 @@
---[[
-    Agents WideOpen - functional UI prototype
-    Purple galaxy theme; designed for Roblox Studio / authorized test places.
-
-    Working:
-      * Draggable GUI, tabs, close button
-      * Star field toggle
-      * FPS counter
-      * Local global-shadows preview toggle
-      * UI-only noclip status indicator
-
-    Not implemented:
-      * WideOpen-specific crash/collision bypasses
-      * Private garage APIs or game-specific motorcycle upgrades
-      * Executor-only hooks
-]]
+-- Agents WideOpen - Bike Tuning UI (Roblox Studio / authorized games only)
+-- Place this LocalScript in StarterPlayer > StarterPlayerScripts.
+-- This is a UI/controller template, not a Potassium executor script.
+-- It intentionally does NOT bypass another game's vehicle physics or collision rules.
+--
+-- To make these controls affect your own game, create a BindableEvent named
+-- "AgentsBikeTuneRequest" in ReplicatedStorage and connect it to your own
+-- vehicle controller. Validate all values on the server before applying them.
+-- For noclip in your own game, implement collision handling in your vehicle
+-- controller/server rather than trusting a client-only toggle.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
-if not player then
-    warn("Agents WideOpen must run on the client.")
-    return
-end
-local playerGui = player:WaitForChild("PlayerGui")
+local tuneEvent = ReplicatedStorage:FindFirstChild("AgentsBikeTuneRequest")
 
-local oldGui = playerGui:FindFirstChild("AgentsWideOpen")
-if oldGui then oldGui:Destroy() end
+local purple = Color3.fromRGB(150, 65, 255)
+local deepPurple = Color3.fromRGB(25, 10, 45)
+local panelPurple = Color3.fromRGB(43, 20, 70)
+local white = Color3.fromRGB(245, 239, 255)
+local muted = Color3.fromRGB(190, 170, 215)
 
-local C = {
-    purple = Color3.fromRGB(176, 85, 255),
-    bright = Color3.fromRGB(220, 165, 255),
-    dark = Color3.fromRGB(16, 10, 29),
-    panel = Color3.fromRGB(29, 18, 48),
-    muted = Color3.fromRGB(178, 154, 205),
-    white = Color3.fromRGB(250, 245, 255),
-    active = Color3.fromRGB(83, 45, 120),
-}
+local gui = Instance.new("ScreenGui")
+gui.Name = "AgentsWideOpen"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local connections = {}
-local destroyed = false
-local fpsEnabled = false
-local fpsLabel
-local fpsFrames, fpsElapsed = 0, 0
-local graphicsEnabled = false
-local originalShadows = Lighting.GlobalShadows
-local starsVisible = true
-local noclipStatus = false
-local currentPage = "Home"
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.fromOffset(520, 410)
+main.Position = UDim2.new(0.5, -260, 0.5, -205)
+main.BackgroundColor3 = deepPurple
+main.BorderSizePixel = 0
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 14)
 
-local function track(connection)
-    table.insert(connections, connection)
-    return connection
-end
+local stroke = Instance.new("UIStroke")
+stroke.Color = purple
+stroke.Thickness = 2
+stroke.Parent = main
 
-local function new(className, props, parent)
-    local obj = Instance.new(className)
-    for k, v in pairs(props or {}) do
-        obj[k] = v
-    end
-    obj.Parent = parent
-    return obj
-end
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -55, 0, 48)
+title.Position = UDim2.fromOffset(18, 6)
+title.BackgroundTransparency = 1
+title.Text = "✦ AGENTS WIDEOPEN ✦"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 22
+title.TextColor3 = white
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = main
 
-local function corner(obj, radius)
-    new("UICorner", {CornerRadius = UDim.new(0, radius or 9)}, obj)
-end
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(34, 32)
+close.Position = UDim2.new(1, -44, 0, 12)
+close.Text = "×"
+close.Font = Enum.Font.GothamBold
+close.TextSize = 24
+close.TextColor3 = white
+close.BackgroundColor3 = panelPurple
+close.Parent = main
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 8)
+close.MouseButton1Click:Connect(function() gui.Enabled = false end)
 
-local function stroke(obj, color, transparency, thickness)
-    new("UIStroke", {
-        Color = color or C.purple,
-        Transparency = transparency or 0,
-        Thickness = thickness or 1,
-    }, obj)
-end
+local tabs = Instance.new("Frame")
+tabs.Size = UDim2.new(1, -28, 0, 38)
+tabs.Position = UDim2.fromOffset(14, 58)
+tabs.BackgroundTransparency = 1
+tabs.Parent = main
 
-local function text(parent, value, size, pos, fontSize, color, font, xAlign)
-    return new("TextLabel", {
-        BackgroundTransparency = 1,
-        Text = value,
-        Size = size,
-        Position = pos,
-        TextSize = fontSize or 13,
-        TextColor3 = color or C.white,
-        Font = font or Enum.Font.Gotham,
-        TextXAlignment = xAlign or Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Center,
-        TextWrapped = true,
-    }, parent)
-end
-
-local gui = new("ScreenGui", {
-    Name = "AgentsWideOpen",
-    ResetOnSpawn = false,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-}, playerGui)
-
-local main = new("Frame", {
-    Name = "Main",
-    Size = UDim2.fromOffset(660, 450),
-    Position = UDim2.new(0.5, -330, 0.5, -225),
-    BackgroundColor3 = C.dark,
-    BorderSizePixel = 0,
-    ClipsDescendants = true,
-}, gui)
-corner(main, 14)
-stroke(main, C.purple, 0.08, 2)
-
-local starField = new("Frame", {
-    Name = "StarField",
-    Size = UDim2.fromScale(1, 1),
-    BackgroundTransparency = 1,
-    ZIndex = 0,
-}, main)
-
-local rng = Random.new(8112)
-for i = 1, 64 do
-    local s = new("TextLabel", {
-        Name = "Star" .. i,
-        BackgroundTransparency = 1,
-        Text = i % 4 == 0 and "✦" or "·",
-        TextColor3 = C.bright,
-        TextTransparency = rng:NextNumber(0.2, 0.72),
-        TextSize = rng:NextInteger(9, 19),
-        Size = UDim2.fromOffset(22, 22),
-        Position = UDim2.new(rng:NextNumber(0, 0.96), 0, rng:NextNumber(0, 0.95), 0),
-        ZIndex = 0,
-    }, starField)
-end
-
-local header = new("Frame", {
-    Name = "Header",
-    Size = UDim2.new(1, 0, 0, 76),
-    BackgroundColor3 = Color3.fromRGB(24, 13, 42),
-    BackgroundTransparency = 0.1,
-    BorderSizePixel = 0,
-    ZIndex = 1,
-}, main)
-
-text(header, "✦  AGENTS WIDEOPEN", UDim2.new(1, -90, 0, 34),
-    UDim2.fromOffset(18, 7), 22, C.bright, Enum.Font.GothamBlack)
-text(header, "MOTORCYCLE UTILITIES  •  PURPLE GALAXY", UDim2.new(1, -100, 0, 20),
-    UDim2.fromOffset(20, 43), 10, C.muted)
-
-local closeButton = new("TextButton", {
-    Name = "Close",
-    Size = UDim2.fromOffset(36, 32),
-    Position = UDim2.new(1, -48, 0, 15),
-    BackgroundColor3 = C.panel,
-    Text = "×",
-    TextColor3 = C.white,
-    TextSize = 24,
-    Font = Enum.Font.GothamBold,
-    ZIndex = 3,
-}, header)
-corner(closeButton, 8)
-stroke(closeButton, C.purple, 0.25, 1)
-
--- Drag handling supports mouse and touch.
-local dragging, dragInput, dragStart, startPosition = false, nil, nil, nil
-track(header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPosition = main.Position
-        track(input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end))
-    end
-end))
-track(header.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end))
-track(UserInputService.InputChanged:Connect(function(input)
-    if dragging and input == dragInput then
-        local delta = input.Position - dragStart
-        main.Position = UDim2.new(
-            startPosition.X.Scale, startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale, startPosition.Y.Offset + delta.Y
-        )
-    end
-end))
-
-local sidebar = new("Frame", {
-    Name = "Sidebar",
-    Position = UDim2.fromOffset(12, 88),
-    Size = UDim2.new(0, 160, 1, -100),
-    BackgroundColor3 = Color3.fromRGB(22, 14, 36),
-    BackgroundTransparency = 0.08,
-    BorderSizePixel = 0,
-    ZIndex = 1,
-}, main)
-corner(sidebar, 10)
-stroke(sidebar, C.purple, 0.72, 1)
-new("UIPadding", {
-    PaddingTop = UDim.new(0, 10),
-    PaddingLeft = UDim.new(0, 9),
-    PaddingRight = UDim.new(0, 9),
-}, sidebar)
-new("UIListLayout", {
-    Padding = UDim.new(0, 7),
-    SortOrder = Enum.SortOrder.LayoutOrder,
-}, sidebar)
-
-local body = new("Frame", {
-    Name = "PageBody",
-    Position = UDim2.fromOffset(184, 88),
-    Size = UDim2.new(1, -196, 1, -100),
-    BackgroundTransparency = 1,
-    ZIndex = 1,
-}, main)
-local pageTitle = text(body, "Home", UDim2.new(1, 0, 0, 30),
-    UDim2.fromOffset(2, 0), 19, C.bright, Enum.Font.GothamBold)
-
-local content = new("ScrollingFrame", {
-    Name = "Content",
-    Position = UDim2.fromOffset(0, 36),
-    Size = UDim2.new(1, 0, 1, -36),
-    BackgroundTransparency = 1,
-    BorderSizePixel = 0,
-    ScrollBarThickness = 4,
-    ScrollBarImageColor3 = C.purple,
-    CanvasSize = UDim2.fromOffset(0, 0),
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    ZIndex = 1,
-}, body)
-new("UIPadding", {
-    PaddingBottom = UDim.new(0, 12),
-    PaddingRight = UDim.new(0, 6),
-}, content)
-new("UIListLayout", {
-    Padding = UDim.new(0, 9),
-    SortOrder = Enum.SortOrder.LayoutOrder,
-}, content)
-
-local function clearContent()
-    for _, child in ipairs(content:GetChildren()) do
-        if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
-            child:Destroy()
-        end
-    end
-end
-
-local function card(titleText, description, height)
-    local f = new("Frame", {
-        BackgroundColor3 = C.panel,
-        BackgroundTransparency = 0.05,
-        BorderSizePixel = 0,
-        Size = UDim2.new(1, -4, 0, height or (description and 84 or 60)),
-        ZIndex = 2,
-    }, content)
-    corner(f, 9)
-    stroke(f, C.purple, 0.68, 1)
-    text(f, titleText, UDim2.new(1, -22, 0, 25),
-        UDim2.fromOffset(12, 6), 14, C.bright, Enum.Font.GothamBold).ZIndex = 3
-    if description then
-        text(f, description, UDim2.new(1, -22, 0, 38),
-            UDim2.fromOffset(12, 32), 11, C.muted).ZIndex = 3
-    end
-    return f
-end
-
-local function button(parent, caption, callback)
-    local b = new("TextButton", {
-        Size = UDim2.new(1, -20, 0, 34),
-        Position = UDim2.new(0, 10, 1, -40),
-        BackgroundColor3 = Color3.fromRGB(52, 30, 78),
-        BorderSizePixel = 0,
-        Text = caption,
-        TextColor3 = C.white,
-        TextSize = 12,
-        Font = Enum.Font.GothamSemibold,
-        AutoButtonColor = true,
-        ZIndex = 4,
-    }, parent)
-    corner(b, 7)
-    stroke(b, C.purple, 0.65, 1)
-    track(b.Activated:Connect(function() callback(b) end))
+local function makeTab(text, x)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(0.5, -5, 1, 0)
+    b.Position = UDim2.new(x, x == 0 and 0 or 10, 0, 0)
+    b.BackgroundColor3 = panelPurple
+    b.TextColor3 = white
+    b.Font = Enum.Font.GothamSemibold
+    b.TextSize = 14
+    b.Text = text
+    b.Parent = tabs
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
     return b
 end
 
-local function showHome()
-    clearContent()
-    card("Welcome to Agents WideOpen", "Purple galaxy interface with working local utility controls.")
-    card("Performance", "Open the Performance tab for an FPS counter and local shadow preview.")
-    card("Customization", "Use the game's official garage for bike upgrades. This UI does not have access to private garage APIs.")
-    card("Feature status", "Noclip is a status indicator only; it does not change game collision behavior.")
+local performanceTab = makeTab("BIKE PERFORMANCE", 0)
+local visualTab = makeTab("VISUALS", 0.5)
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -28, 1, -120)
+content.Position = UDim2.fromOffset(14, 106)
+content.BackgroundColor3 = panelPurple
+content.BorderSizePixel = 0
+content.Parent = main
+Instance.new("UICorner", content).CornerRadius = UDim.new(0, 10)
+
+local note = Instance.new("TextLabel")
+note.Size = UDim2.new(1, -28, 0, 34)
+note.Position = UDim2.new(0, 14, 1, -42)
+note.BackgroundTransparency = 1
+note.TextColor3 = muted
+note.TextSize = 11
+note.Font = Enum.Font.Gotham
+note.Text = "Studio template • tune requests require your own vehicle controller"
+note.Parent = main
+
+local currentPage = "performance"
+local values = {topSpeed = 150, acceleration = 100, handling = 50, noclip = false}
+local function requestTune()
+    if tuneEvent and tuneEvent:IsA("BindableEvent") then
+        tuneEvent:Fire({
+            topSpeed = values.topSpeed,
+            acceleration = values.acceleration,
+            handling = values.handling,
+            noclip = values.noclip
+        })
+    end
 end
 
-local function showPerformance()
-    clearContent()
-    card("Performance tools", "These options affect local display settings only.")
-    local fpsCard = card("FPS counter", "Displays an FPS overlay in the top-left corner.", 88)
-    local fpsButton = button(fpsCard, fpsEnabled and "Disable FPS counter" or "Enable FPS counter", function(b)
-        fpsEnabled = not fpsEnabled
-        b.Text = fpsEnabled and "Disable FPS counter" or "Enable FPS counter"
-        if fpsEnabled and not fpsLabel then
-            fpsLabel = new("TextLabel", {
-                Name = "FPSOverlay",
-                Size = UDim2.fromOffset(150, 30),
-                Position = UDim2.fromOffset(12, 12),
-                BackgroundColor3 = C.dark,
-                TextColor3 = C.bright,
-                Font = Enum.Font.GothamBold,
-                TextSize = 14,
-                ZIndex = 10,
-            }, gui)
-            corner(fpsLabel, 8)
-            stroke(fpsLabel, C.purple, 0, 1)
-        elseif not fpsEnabled and fpsLabel then
-            fpsLabel:Destroy()
-            fpsLabel = nil
-        end
-    end)
-    fpsButton.Name = "ToggleFPS"
+local function clearContent()
+    for _, child in ipairs(content:GetChildren()) do child:Destroy() end
+end
 
-    local shadowCard = card("Low-graphics preview", "Toggle global shadows and restore the original value when disabled.", 88)
-    local shadowButton = button(shadowCard,
-        graphicsEnabled and "Disable low-graphics preview" or "Enable low-graphics preview",
-        function(b)
-            graphicsEnabled = not graphicsEnabled
-            if graphicsEnabled then
-                Lighting.GlobalShadows = false
-            else
-                Lighting.GlobalShadows = originalShadows
+local function makeSlider(labelText, key, minValue, maxValue, y)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -30, 0, 24)
+    label.Position = UDim2.fromOffset(15, y)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextColor3 = white
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 14
+    label.Text = labelText .. ": " .. values[key] .. "%"
+    label.Parent = content
+
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(1, -30, 0, 10)
+    bar.Position = UDim2.fromOffset(15, y + 31)
+    bar.BackgroundColor3 = deepPurple
+    bar.BorderSizePixel = 0
+    bar.Parent = content
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((values[key] - minValue) / (maxValue - minValue), 0, 1, 0)
+    fill.BackgroundColor3 = purple
+    fill.BorderSizePixel = 0
+    fill.Parent = bar
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 26)
+    button.Position = UDim2.new(0, 0, 0.5, -13)
+    button.BackgroundTransparency = 1
+    button.Text = ""
+    button.Parent = bar
+
+    local function setFromX(x)
+        local ratio = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        local v = math.floor((minValue + ratio * (maxValue - minValue)) / 5 + 0.5) * 5
+        values[key] = math.clamp(v, minValue, maxValue)
+        label.Text = labelText .. ": " .. values[key] .. "%"
+        fill.Size = UDim2.new((values[key] - minValue) / (maxValue - minValue), 0, 1, 0)
+        requestTune()
+    end
+    button.Activated:Connect(function()
+        setFromX(UserInputService:GetMouseLocation().X)
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+            and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+            local mouse = UserInputService:GetMouseLocation()
+            if mouse.Y >= bar.AbsolutePosition.Y - 8 and mouse.Y <= bar.AbsolutePosition.Y + bar.AbsoluteSize.Y + 8 then
+                setFromX(mouse.X)
             end
-            b.Text = graphicsEnabled and "Disable low-graphics preview" or "Enable low-graphics preview"
-        end)
-    shadowButton.Name = "ToggleShadows"
-end
-
-local function showCustomization()
-    clearContent()
-    card("Motorcycle customization", "This menu cannot change WideOpen's private bike data without an official supported API.")
-    local c = card("Open the official garage", "Use the game's normal garage interaction to change paint, rims, exhaust, and other supported parts.", 88)
-    button(c, "Garage instructions", function()
-        warn("Agents WideOpen: use the in-game garage to customize your motorcycle.")
-    end)
-    card("Why upgrades are not wired here", "The provided source only contained collision/crash hooks and a small toggle; it did not include garage customization functions.")
-end
-
-local function showNoclip()
-    clearContent()
-    card("Noclip status", "UI indicator only. It does not disable WideOpen's collision, crash, or police systems.")
-    local c = card("Status indicator", "Press N or click below to change the displayed status.", 88)
-    local b = button(c, noclipStatus and "Noclip status: ON" or "Noclip status: OFF", function(btn)
-        noclipStatus = not noclipStatus
-        btn.Text = noclipStatus and "Noclip status: ON" or "Noclip status: OFF"
-        btn.BackgroundColor3 = noclipStatus and C.active or Color3.fromRGB(52, 30, 78)
-    end)
-    b.Name = "NoclipStatus"
-end
-
-local function showSettings()
-    clearContent()
-    card("Settings", "Personalize the interface.")
-    local starCard = card("Star field", "Show or hide the purple decorative stars.", 88)
-    button(starCard, starsVisible and "Hide stars" or "Show stars", function(b)
-        starsVisible = not starsVisible
-        starField.Visible = starsVisible
-        b.Text = starsVisible and "Hide stars" or "Show stars"
-    end)
-    local resetCard = card("Reset graphics", "Restore the original global-shadows setting.", 88)
-    button(resetCard, "Reset visuals", function()
-        graphicsEnabled = false
-        Lighting.GlobalShadows = originalShadows
-        showSettings()
-    end)
-end
-
-local pages = {
-    Home = showHome,
-    Performance = showPerformance,
-    Customization = showCustomization,
-    Noclip = showNoclip,
-    Settings = showSettings,
-}
-
-local function openPage(name)
-    currentPage = name
-    pageTitle.Text = name
-    local renderPage = pages[name] or showHome
-    renderPage()
-end
-
-local navButtons = {}
-for index, name in ipairs({"Home", "Performance", "Customization", "Noclip", "Settings"}) do
-    local b = new("TextButton", {
-        Name = name .. "Tab",
-        Size = UDim2.new(1, 0, 0, 42),
-        BackgroundColor3 = name == "Home" and C.active or C.panel,
-        BackgroundTransparency = name == "Home" and 0 or 0.22,
-        BorderSizePixel = 0,
-        Text = "✦   " .. name,
-        TextColor3 = C.white,
-        TextSize = 12,
-        Font = Enum.Font.GothamSemibold,
-        LayoutOrder = index,
-        ZIndex = 2,
-    }, sidebar)
-    corner(b, 8)
-    stroke(b, C.purple, 0.75, 1)
-    navButtons[name] = b
-    track(b.Activated:Connect(function()
-        for _, other in pairs(navButtons) do
-            other.BackgroundColor3 = C.panel
-            other.BackgroundTransparency = 0.22
         end
-        b.BackgroundColor3 = C.active
-        b.BackgroundTransparency = 0
-        openPage(name)
-    end))
+    end)
 end
 
-track(UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.N and gui.Parent then
-        noclipStatus = not noclipStatus
-        if currentPage == "Noclip" then showNoclip() end
-    end
-end))
+local function renderPerformance()
+    currentPage = "performance"
+    clearContent()
+    makeSlider("Top speed", "topSpeed", 50, 300, 18)
+    makeSlider("Acceleration", "acceleration", 0, 200, 94)
+    makeSlider("Handling", "handling", 0, 100, 170)
 
-track(RunService.RenderStepped:Connect(function(dt)
-    if destroyed or not fpsEnabled or not fpsLabel or not fpsLabel.Parent then return end
-    fpsFrames += 1
-    fpsElapsed += dt
-    if fpsElapsed >= 0.5 then
-        fpsLabel.Text = "✦  FPS: " .. math.floor(fpsFrames / fpsElapsed)
-        fpsFrames, fpsElapsed = 0, 0
-    end
-end))
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(1, -30, 0, 42)
+    toggle.Position = UDim2.fromOffset(15, 250)
+    toggle.BackgroundColor3 = values.noclip and purple or deepPurple
+    toggle.TextColor3 = white
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextSize = 14
+    toggle.Text = "VEHICLE NOCLIP: " .. (values.noclip and "ON" or "OFF")
+    toggle.Parent = content
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 8)
+    toggle.Activated:Connect(function()
+        values.noclip = not values.noclip
+        toggle.Text = "VEHICLE NOCLIP: " .. (values.noclip and "ON" or "OFF")
+        toggle.BackgroundColor3 = values.noclip and purple or deepPurple
+        requestTune()
+    end)
 
-track(closeButton.Activated:Connect(function()
-    gui:Destroy()
-end))
+    local hint = Instance.new("TextLabel")
+    hint.Size = UDim2.new(1, -30, 0, 30)
+    hint.Position = UDim2.fromOffset(15, 300)
+    hint.BackgroundTransparency = 1
+    hint.TextWrapped = true
+    hint.TextColor3 = muted
+    hint.Font = Enum.Font.Gotham
+    hint.TextSize = 11
+    hint.Text = "Controls send tuning requests only. Your own vehicle controller must apply them."
+    hint.Parent = content
+end
 
-gui.Destroying:Connect(function()
-    destroyed = true
-    for _, connection in ipairs(connections) do
-        pcall(function() connection:Disconnect() end)
+local function renderVisuals()
+    currentPage = "visuals"
+    clearContent()
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -30, 0, 55)
+    label.Position = UDim2.fromOffset(15, 15)
+    label.BackgroundTransparency = 1
+    label.TextWrapped = true
+    label.TextColor3 = white
+    label.Font = Enum.Font.GothamSemibold
+    label.TextSize = 14
+    label.Text = "Purple star theme enabled ✦"
+    label.Parent = content
+
+    local shadow = Instance.new("TextButton")
+    shadow.Size = UDim2.new(1, -30, 0, 42)
+    shadow.Position = UDim2.fromOffset(15, 82)
+    shadow.BackgroundColor3 = deepPurple
+    shadow.TextColor3 = white
+    shadow.Font = Enum.Font.GothamBold
+    shadow.TextSize = 14
+    shadow.Text = "TOGGLE GLOBAL SHADOWS"
+    shadow.Parent = content
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 8)
+    shadow.Activated:Connect(function()
+        Lighting.GlobalShadows = not Lighting.GlobalShadows
+        shadow.Text = "GLOBAL SHADOWS: " .. (Lighting.GlobalShadows and "ON" or "OFF")
+    end)
+end
+
+performanceTab.Activated:Connect(renderPerformance)
+visualTab.Activated:Connect(renderVisuals)
+renderPerformance()
+
+-- RightShift toggles the menu after it has been created.
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+        gui.Enabled = not gui.Enabled
     end
-    if fpsLabel then fpsLabel:Destroy() end
-    Lighting.GlobalShadows = originalShadows
 end)
-
-openPage("Home")
