@@ -338,7 +338,11 @@ local function showPerformance()
     local gfxCard = makeCard("Low-graphics preview", "Toggle global shadows locally. Other effects may be controlled by the game.")
     local gfxButton = addButton(gfxCard, "Enable low-graphics preview", function(button)
         graphicsPreview = not graphicsPreview
-        Lighting.GlobalShadows = graphicsPreview and false or oldGlobalShadows
+        if graphicsPreview then
+            Lighting.GlobalShadows = false
+        else
+            Lighting.GlobalShadows = oldGlobalShadows
+        end
         button.Text = graphicsPreview and "Disable low-graphics preview" or "Enable low-graphics preview"
     end)
     gfxButton.Position = UDim2.new(0, 10, 1, -39)
@@ -395,7 +399,8 @@ local pages = {
 
 local function openPage(name)
     pageTitle.Text = name
-    (pages[name] or showHome)()
+    local renderer = pages[name] or showHome
+    renderer()
 end
 
 for index, name in ipairs({"Home", "Performance", "Customization", "Noclip", "Settings"}) do
@@ -437,6 +442,7 @@ local shortcutConnection = UserInputService.InputBegan:Connect(function(input, p
     end
 end)
 table.insert(connections, shortcutConnection)
+table.insert(connections, dragConnection)
 
 local fpsConnection = RunService.RenderStepped:Connect(function(dt)
     if not fpsEnabled or not fpsLabel or not fpsLabel.Parent then
