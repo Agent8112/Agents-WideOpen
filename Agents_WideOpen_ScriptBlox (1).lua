@@ -296,9 +296,86 @@ local function showHome()
     card("Feature status", "Noclip is a status indicator only; it does not change game collision behavior.")
 end
 
+local bikeTunePreview = {topSpeed = 150, acceleration = 100, handling = 50}
+
+local function addTuneSlider(titleText, key, minValue, maxValue, height)
+    local f = card(titleText, "Preview setting — not connected to WideOpen's live bike physics.", height or 94)
+    local valueLabel = text(f, tostring(bikeTunePreview[key]) .. "%", UDim2.fromOffset(58, 24),
+        UDim2.new(1, -72, 0, 7), 13, C.bright, Enum.Font.GothamBold, Enum.TextXAlignment.Right)
+
+    local trackFrame = new("Frame", {
+        Size = UDim2.new(1, -24, 0, 10),
+        Position = UDim2.fromOffset(12, 53),
+        BackgroundColor3 = C.dark,
+        BorderSizePixel = 0,
+    }, f)
+    corner(trackFrame, 8)
+
+    local ratio = (bikeTunePreview[key] - minValue) / (maxValue - minValue)
+    local fill = new("Frame", {
+        Size = UDim2.new(ratio, 0, 1, 0),
+        BackgroundColor3 = C.purple,
+        BorderSizePixel = 0,
+    }, trackFrame)
+    corner(fill, 8)
+
+    local knob = new("Frame", {
+        Size = UDim2.fromOffset(16, 16),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(ratio, 0, 0.5, 0),
+        BackgroundColor3 = C.white,
+        BorderSizePixel = 0,
+        ZIndex = 3,
+    }, trackFrame)
+    corner(knob, 8)
+    stroke(knob, C.purple, 0, 2)
+
+    local hitbox = new("TextButton", {
+        Size = UDim2.new(1, 0, 0, 28),
+        Position = UDim2.new(0, 0, 0.5, -14),
+        BackgroundTransparency = 1,
+        Text = "",
+        ZIndex = 4,
+    }, trackFrame)
+
+    local draggingSlider = false
+    local function setValue(x)
+        local r = math.clamp((x - trackFrame.AbsolutePosition.X) / trackFrame.AbsoluteSize.X, 0, 1)
+        local v = math.floor((minValue + r * (maxValue - minValue)) / 5 + 0.5) * 5
+        bikeTunePreview[key] = math.clamp(v, minValue, maxValue)
+        local newRatio = (bikeTunePreview[key] - minValue) / (maxValue - minValue)
+        valueLabel.Text = tostring(bikeTunePreview[key]) .. "%"
+        fill.Size = UDim2.new(newRatio, 0, 1, 0)
+        knob.Position = UDim2.new(newRatio, 0, 0.5, 0)
+    end
+    track(hitbox.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = true
+            setValue(input.Position.X)
+        end
+    end))
+    track(UserInputService.InputChanged:Connect(function(input)
+        if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch) then
+            setValue(input.Position.X)
+        end
+    end))
+    track(UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            draggingSlider = false
+        end
+    end))
+end
+
 local function showPerformance()
     clearContent()
-    card("Performance tools", "These options affect local display settings only.")
+    card("Bike tuning", "Interactive sliders for top speed, acceleration, and handling. These are UI previews until connected to an authorized vehicle controller.", 70)
+    addTuneSlider("Top speed", "topSpeed", 50, 300, 82)
+    addTuneSlider("Acceleration", "acceleration", 0, 200, 82)
+    addTuneSlider("Handling", "handling", 0, 100, 82)
+
     local fpsCard = card("FPS counter", "Displays an FPS overlay in the top-left corner.", 88)
     local fpsButton = button(fpsCard, fpsEnabled and "Disable FPS counter" or "Enable FPS counter", function(b)
         fpsEnabled = not fpsEnabled
@@ -323,16 +400,12 @@ local function showPerformance()
     end)
     fpsButton.Name = "ToggleFPS"
 
-    local shadowCard = card("Low-graphics preview", "Toggle global shadows and restore the original value when disabled.", 88)
+    local shadowCard = card("Low-graphics preview", "Toggle local global shadows to reduce visual effects.", 88)
     local shadowButton = button(shadowCard,
         graphicsEnabled and "Disable low-graphics preview" or "Enable low-graphics preview",
         function(b)
             graphicsEnabled = not graphicsEnabled
-            if graphicsEnabled then
-                Lighting.GlobalShadows = false
-            else
-                Lighting.GlobalShadows = originalShadows
-            end
+            Lighting.GlobalShadows = not graphicsEnabled and originalShadows or false
             b.Text = graphicsEnabled and "Disable low-graphics preview" or "Enable low-graphics preview"
         end)
     shadowButton.Name = "ToggleShadows"
