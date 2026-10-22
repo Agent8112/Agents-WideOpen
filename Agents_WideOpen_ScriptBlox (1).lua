@@ -450,3 +450,10 @@ gui.Destroying:Connect(function()
 end)
 
 openPage("Home")
+
+
+-- Diagnostic note:
+-- This UI is designed for a Roblox LocalScript in a game you own/control.
+-- If run from an executor, services or UI input behavior may differ. Check the
+-- executor console for the first error line; the UI cannot control a third-party
+-- game's bike physics without an authorized vehicle-tuning interface.
