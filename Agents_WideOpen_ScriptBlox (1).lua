@@ -126,6 +126,7 @@ end
 
 local function makeSlider(labelText, key, minValue, maxValue, y)
     local label = Instance.new("TextLabel")
+    label.Name = key .. "Label"
     label.Size = UDim2.new(1, -30, 0, 24)
     label.Position = UDim2.fromOffset(15, y)
     label.BackgroundTransparency = 1
@@ -137,45 +138,78 @@ local function makeSlider(labelText, key, minValue, maxValue, y)
     label.Parent = content
 
     local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(1, -30, 0, 10)
+    bar.Name = key .. "SliderTrack"
+    bar.Size = UDim2.new(1, -30, 0, 12)
     bar.Position = UDim2.fromOffset(15, y + 31)
-    bar.BackgroundColor3 = deepPurple
+    bar.BackgroundColor3 = Color3.fromRGB(20, 8, 34)
     bar.BorderSizePixel = 0
+    bar.ClipsDescendants = false
     bar.Parent = content
     Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
 
     local fill = Instance.new("Frame")
+    fill.Name = "Fill"
     fill.Size = UDim2.new((values[key] - minValue) / (maxValue - minValue), 0, 1, 0)
     fill.BackgroundColor3 = purple
     fill.BorderSizePixel = 0
     fill.Parent = bar
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 26)
-    button.Position = UDim2.new(0, 0, 0.5, -13)
-    button.BackgroundTransparency = 1
-    button.Text = ""
-    button.Parent = bar
+    local knob = Instance.new("Frame")
+    knob.Name = "Knob"
+    knob.Size = UDim2.fromOffset(18, 18)
+    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.Position = UDim2.new((values[key] - minValue) / (maxValue - minValue), 0, 0.5, 0)
+    knob.BackgroundColor3 = white
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 3
+    knob.Parent = bar
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+    local knobStroke = Instance.new("UIStroke")
+    knobStroke.Color = purple
+    knobStroke.Thickness = 2
+    knobStroke.Parent = knob
 
-    local function setFromX(x)
-        local ratio = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
-        local v = math.floor((minValue + ratio * (maxValue - minValue)) / 5 + 0.5) * 5
-        values[key] = math.clamp(v, minValue, maxValue)
+    local hitbox = Instance.new("TextButton")
+    hitbox.Name = key .. "SliderInput"
+    hitbox.Size = UDim2.new(1, 18, 0, 30)
+    hitbox.Position = UDim2.new(0, -9, 0.5, -15)
+    hitbox.BackgroundTransparency = 1
+    hitbox.Text = ""
+    hitbox.ZIndex = 4
+    hitbox.Parent = bar
+
+    local dragging = false
+    local function updateFromScreenX(screenX)
+        local ratio = math.clamp((screenX - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        local value = math.floor((minValue + ratio * (maxValue - minValue)) / 5 + 0.5) * 5
+        values[key] = math.clamp(value, minValue, maxValue)
+        local fillRatio = (values[key] - minValue) / (maxValue - minValue)
         label.Text = labelText .. ": " .. values[key] .. "%"
-        fill.Size = UDim2.new((values[key] - minValue) / (maxValue - minValue), 0, 1, 0)
+        fill.Size = UDim2.new(fillRatio, 0, 1, 0)
+        knob.Position = UDim2.new(fillRatio, 0, 0.5, 0)
         requestTune()
     end
-    button.Activated:Connect(function()
-        setFromX(UserInputService:GetMouseLocation().X)
+
+    hitbox.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            updateFromScreenX(input.Position.X)
+        end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-            local mouse = UserInputService:GetMouseLocation()
-            if mouse.Y >= bar.AbsolutePosition.Y - 8 and mouse.Y <= bar.AbsolutePosition.Y + bar.AbsoluteSize.Y + 8 then
-                setFromX(mouse.X)
-            end
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch) then
+            updateFromScreenX(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
         end
     end)
 end
