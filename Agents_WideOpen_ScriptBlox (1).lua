@@ -1,6 +1,7 @@
 -- Agents WideOpen — Performance UI
 -- Visual slider interface matching the supplied reference image.
--- Sliders update their displayed percentages only; they do not modify game physics.
+-- Sliders update their displayed percentages and calculate preview multipliers.
+-- This UI does not modify another game’s live vehicle physics.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -68,7 +69,9 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
 end)
 
-local function makeSlider(labelText, y, minVal, maxVal, initialVal, leftText, midText, rightText)
+local settings = { topSpeed = 150, acceleration = 75, handling = 20 }
+
+local function makeSlider(labelText, settingKey, y, minVal, maxVal, initialVal, leftText, midText, rightText)
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Position = UDim2.fromOffset(16, y)
@@ -167,6 +170,12 @@ local function makeSlider(labelText, y, minVal, maxVal, initialVal, leftText, mi
         local newR = (v - minVal) / (maxVal - minVal)
         valueLabel.Text = tostring(v) .. "%"
         knob.Position = UDim2.new(newR, 0, 0.5, 0)
+        settings[settingKey] = v
+        -- Example calculations for a vehicle controller in a game you own.
+        settings.topSpeedMultiplier = settings.topSpeed / 100
+        settings.accelerationMultiplier = settings.acceleration / 100
+        settings.handlingMultiplier = settings.handling / 100
+        note.Text = string.format("Preview values — Speed %.2fx, acceleration %.2fx, handling %.2fx. UI preview only; connect these settings to a vehicle controller in your own Roblox Studio game.", settings.topSpeedMultiplier or 1.5, settings.accelerationMultiplier or 0.75, settings.handlingMultiplier or 0.2)
     end
     hit.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -182,9 +191,9 @@ local function makeSlider(labelText, y, minVal, maxVal, initialVal, leftText, mi
     end)
 end
 
-makeSlider("Top speed", 63, 50, 300, 150, "50%", "150%", "300%")
-makeSlider("Acceleration", 163, 0, 200, 75, "0%", "100%", "200%")
-makeSlider("Handling", 263, 0, 100, 20, "0%", "50%", "100%")
+makeSlider("Top speed", "topSpeed", 63, 50, 300, 150, "50%", "150%", "300%")
+makeSlider("Acceleration", "acceleration", 163, 0, 200, 75, "0%", "100%", "200%")
+makeSlider("Handling", "handling", 263, 0, 100, 20, "0%", "50%", "100%")
 
 local note = Instance.new("TextLabel")
 note.Name = "PreviewNote"
@@ -192,7 +201,7 @@ note.BackgroundTransparency = 1
 note.Position = UDim2.fromOffset(16, 361)
 note.Size = UDim2.new(1, -32, 0, 44)
 note.Font = Enum.Font.Gotham
-note.Text = "Preview only — these sliders demonstrate the intended menu and do not change the bike in Roblox."
+note.Text = "Preview values — Speed 1.50x, acceleration 0.75x, handling 0.20x. UI preview only; connect these settings to a vehicle controller in your own Roblox Studio game."
 note.TextSize = 12
 note.TextColor3 = white
 note.TextWrapped = true
