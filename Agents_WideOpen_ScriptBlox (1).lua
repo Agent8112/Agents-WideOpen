@@ -1,215 +1,233 @@
--- Agents WideOpen — Performance UI
--- Visual slider interface matching the supplied reference image.
--- Sliders update their displayed percentages and calculate preview multipliers.
--- This UI does not modify another game’s live vehicle physics.
+-- Agents WideOpen - redesigned UI prototype
+-- UI-only: sliders update their displayed values. This file intentionally does not
+-- hook game modules, bypass crash/collision systems, or modify live vehicle physics.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
-if not player then return end
-local playerGui = player:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local existing = playerGui:FindFirstChild("AgentsWideOpenPerformance")
-if existing then existing:Destroy() end
-
-local purple = Color3.fromRGB(166, 65, 255)
-local white = Color3.fromRGB(245, 245, 250)
-local muted = Color3.fromRGB(190, 190, 200)
-local trackColor = Color3.fromRGB(22, 22, 24)
-local borderColor = Color3.fromRGB(48, 48, 52)
+local old = PlayerGui:FindFirstChild("AgentsWideOpenUI")
+if old then old:Destroy() end
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "AgentsWideOpenPerformance"
+gui.Name = "AgentsWideOpenUI"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
-gui.DisplayOrder = 999
-gui.Parent = playerGui
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-local panel = Instance.new("Frame")
-panel.Name = "PerformancePanel"
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-panel.Position = UDim2.new(0.5, 0, 0.5, 0)
-panel.Size = UDim2.new(0, 640, 0, 418)
-panel.BackgroundColor3 = Color3.fromRGB(5, 5, 6)
-panel.BorderSizePixel = 0
-panel.Parent = gui
-Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 17)
-local panelStroke = Instance.new("UIStroke", panel)
-panelStroke.Color = borderColor
-panelStroke.Thickness = 1
+gui.Parent = PlayerGui
 
-local title = Instance.new("TextLabel")
-title.Name = "Title"
+local purple = Color3.fromRGB(157, 91, 255)
+local bg = Color3.fromRGB(17, 17, 22)
+local panel = Color3.fromRGB(25, 25, 33)
+local muted = Color3.fromRGB(157, 157, 174)
+local white = Color3.fromRGB(244, 242, 250)
+
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.fromOffset(390, 300)
+main.Position = UDim2.new(0.5, -195, 0.5, -150)
+main.BackgroundColor3 = bg
+main.BorderSizePixel = 0
+main.Active = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+local outline = Instance.new("UIStroke", main)
+outline.Color = Color3.fromRGB(63, 49, 86)
+outline.Thickness = 1.2
+
+local top = Instance.new("Frame")
+top.Name = "TopBar"
+top.Size = UDim2.new(1, 0, 0, 54)
+top.BackgroundColor3 = Color3.fromRGB(22, 20, 30)
+top.BorderSizePixel = 0
+top.Parent = main
+Instance.new("UICorner", top).CornerRadius = UDim.new(0, 12)
+local cover = Instance.new("Frame", top)
+cover.Size = UDim2.new(1, 0, 0, 12)
+cover.Position = UDim2.new(0, 0, 1, -12)
+cover.BackgroundColor3 = top.BackgroundColor3
+cover.BorderSizePixel = 0
+
+local accent = Instance.new("Frame", top)
+accent.Size = UDim2.new(0, 4, 0, 26)
+accent.Position = UDim2.new(0, 15, 0, 14)
+accent.BackgroundColor3 = purple
+accent.BorderSizePixel = 0
+Instance.new("UICorner", accent).CornerRadius = UDim.new(1, 0)
+
+local title = Instance.new("TextLabel", top)
 title.BackgroundTransparency = 1
-title.Position = UDim2.fromOffset(16, 13)
-title.Size = UDim2.new(1, -32, 0, 26)
+title.Position = UDim2.fromOffset(28, 8)
+title.Size = UDim2.new(1, -90, 0, 22)
 title.Font = Enum.Font.GothamBold
-title.Text = "◉  Agents WideOpen — Performance"
-title.TextSize = 17
+title.Text = "AGENTS  /  WIDEOPEN"
+title.TextSize = 14
 title.TextColor3 = white
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = panel
 
--- Drag the window by its title.
-local dragging, dragStart, panelStart = false, nil, nil
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        panelStart = panel.Position
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        panel.Position = UDim2.new(panelStart.X.Scale, panelStart.X.Offset + delta.X, panelStart.Y.Scale, panelStart.Y.Offset + delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
-end)
+local subtitle = Instance.new("TextLabel", top)
+subtitle.BackgroundTransparency = 1
+subtitle.Position = UDim2.fromOffset(28, 29)
+subtitle.Size = UDim2.new(1, -90, 0, 16)
+subtitle.Font = Enum.Font.Gotham
+subtitle.Text = "PERFORMANCE CONTROLS"
+subtitle.TextSize = 9
+subtitle.TextColor3 = muted
+subtitle.TextXAlignment = Enum.TextXAlignment.Left
 
-local settings = { topSpeed = 150, acceleration = 75, handling = 20 }
+local hint = Instance.new("TextLabel", top)
+hint.BackgroundTransparency = 1
+hint.AnchorPoint = Vector2.new(1, 0)
+hint.Position = UDim2.new(1, -14, 0, 18)
+hint.Size = UDim2.fromOffset(65, 18)
+hint.Font = Enum.Font.GothamMedium
+hint.Text = "RSHIFT"
+hint.TextSize = 9
+hint.TextColor3 = purple
+hint.TextXAlignment = Enum.TextXAlignment.Right
 
-local function makeSlider(labelText, settingKey, y, minVal, maxVal, initialVal, leftText, midText, rightText)
-    local label = Instance.new("TextLabel")
+local body = Instance.new("Frame", main)
+body.BackgroundTransparency = 1
+body.Position = UDim2.fromOffset(16, 66)
+body.Size = UDim2.new(1, -32, 1, -82)
+
+local function makeSlider(name, minVal, maxVal, initial, y, suffix)
+    local card = Instance.new("Frame", body)
+    card.Name = name .. "Card"
+    card.Position = UDim2.fromOffset(0, y)
+    card.Size = UDim2.new(1, 0, 0, 65)
+    card.BackgroundColor3 = panel
+    card.BorderSizePixel = 0
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+
+    local label = Instance.new("TextLabel", card)
     label.BackgroundTransparency = 1
-    label.Position = UDim2.fromOffset(16, y)
-    label.Size = UDim2.new(1, -32, 0, 23)
+    label.Position = UDim2.fromOffset(12, 7)
+    label.Size = UDim2.new(1, -105, 0, 18)
     label.Font = Enum.Font.GothamSemibold
-    label.Text = labelText
-    label.TextSize = 14
+    label.Text = string.upper(name)
+    label.TextSize = 11
     label.TextColor3 = white
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = panel
 
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.AnchorPoint = Vector2.new(1, 0)
-    valueLabel.Position = UDim2.new(1, -16, 0, y)
-    valueLabel.Size = UDim2.fromOffset(80, 23)
-    valueLabel.Font = Enum.Font.GothamBold
-    valueLabel.Text = tostring(initialVal) .. "%"
-    valueLabel.TextSize = 14
-    valueLabel.TextColor3 = purple
-    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valueLabel.Parent = panel
+    local value = Instance.new("TextLabel", card)
+    value.Name = "Value"
+    value.BackgroundTransparency = 1
+    value.AnchorPoint = Vector2.new(1, 0)
+    value.Position = UDim2.new(1, -12, 0, 7)
+    value.Size = UDim2.fromOffset(85, 18)
+    value.Font = Enum.Font.GothamBold
+    value.Text = tostring(initial) .. suffix
+    value.TextSize = 11
+    value.TextColor3 = purple
+    value.TextXAlignment = Enum.TextXAlignment.Right
 
-    local bar = Instance.new("Frame")
-    bar.Name = labelText:gsub("%s", "") .. "Track"
-    bar.Position = UDim2.fromOffset(16, y + 28)
-    bar.Size = UDim2.new(1, -32, 0, 24)
-    bar.BackgroundColor3 = trackColor
-    bar.BorderSizePixel = 0
-    bar.ClipsDescendants = false
-    bar.Parent = panel
-    Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+    local track = Instance.new("Frame", card)
+    track.Name = "Track"
+    track.Position = UDim2.fromOffset(12, 38)
+    track.Size = UDim2.new(1, -24, 0, 5)
+    track.BackgroundColor3 = Color3.fromRGB(53, 51, 64)
+    track.BorderSizePixel = 0
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-    local ratio = (initialVal - minVal) / (maxVal - minVal)
-    local knob = Instance.new("Frame")
+    local ratio = (initial - minVal) / (maxVal - minVal)
+    local fill = Instance.new("Frame", track)
+    fill.Name = "Fill"
+    fill.Size = UDim2.new(ratio, 0, 1, 0)
+    fill.BackgroundColor3 = purple
+    fill.BorderSizePixel = 0
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame", track)
     knob.Name = "Knob"
     knob.AnchorPoint = Vector2.new(0.5, 0.5)
     knob.Position = UDim2.new(ratio, 0, 0.5, 0)
-    knob.Size = UDim2.fromOffset(20, 20)
-    knob.BackgroundColor3 = Color3.fromRGB(248, 248, 250)
+    knob.Size = UDim2.fromOffset(13, 13)
+    knob.BackgroundColor3 = white
     knob.BorderSizePixel = 0
     knob.ZIndex = 3
-    knob.Parent = bar
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+    local ks = Instance.new("UIStroke", knob)
+    ks.Color = purple
+    ks.Thickness = 1.5
 
-    local hit = Instance.new("TextButton")
-    hit.Name = "SliderHitbox"
+    local current = initial
+    local dragging = false
+    local function setFromX(x)
+        local left = track.AbsolutePosition.X
+        local width = track.AbsoluteSize.X
+        local r = math.clamp((x - left) / width, 0, 1)
+        current = math.floor((minVal + (maxVal - minVal) * r) + 0.5)
+        fill.Size = UDim2.new(r, 0, 1, 0)
+        knob.Position = UDim2.new(r, 0, 0.5, 0)
+        value.Text = tostring(current) .. suffix
+        -- Display value only; connect to an authorized vehicle controller in your own game.
+    end
+    local hit = Instance.new("TextButton", track)
+    hit.Name = "SliderInput"
     hit.BackgroundTransparency = 1
     hit.Text = ""
-    hit.Size = UDim2.new(1, 0, 1, 12)
-    hit.Position = UDim2.new(0, 0, 0, -6)
+    hit.Size = UDim2.new(1, 16, 1, 20)
+    hit.Position = UDim2.fromOffset(-8, -10)
     hit.ZIndex = 4
-    hit.Parent = bar
-
-    local left = Instance.new("TextLabel")
-    left.BackgroundTransparency = 1
-    left.Position = UDim2.new(0, 0, 1, 7)
-    left.Size = UDim2.new(0.33, 0, 0, 16)
-    left.Font = Enum.Font.Gotham
-    left.Text = leftText
-    left.TextSize = 11
-    left.TextColor3 = muted
-    left.TextXAlignment = Enum.TextXAlignment.Left
-    left.Parent = bar
-
-    local mid = Instance.new("TextLabel")
-    mid.BackgroundTransparency = 1
-    mid.AnchorPoint = Vector2.new(0.5, 0)
-    mid.Position = UDim2.new(0.5, 0, 1, 7)
-    mid.Size = UDim2.new(0.34, 0, 0, 16)
-    mid.Font = Enum.Font.Gotham
-    mid.Text = midText
-    mid.TextSize = 11
-    mid.TextColor3 = muted
-    mid.TextXAlignment = Enum.TextXAlignment.Center
-    mid.Parent = bar
-
-    local right = Instance.new("TextLabel")
-    right.BackgroundTransparency = 1
-    right.AnchorPoint = Vector2.new(1, 0)
-    right.Position = UDim2.new(1, 0, 1, 7)
-    right.Size = UDim2.new(0.33, 0, 0, 16)
-    right.Font = Enum.Font.Gotham
-    right.Text = rightText
-    right.TextSize = 11
-    right.TextColor3 = muted
-    right.TextXAlignment = Enum.TextXAlignment.Right
-    right.Parent = bar
-
-    local active = false
-    local function update(x)
-        local width = math.max(bar.AbsoluteSize.X, 1)
-        local r = math.clamp((x - bar.AbsolutePosition.X) / width, 0, 1)
-        local v = math.floor((minVal + r * (maxVal - minVal)) / 5 + 0.5) * 5
-        v = math.clamp(v, minVal, maxVal)
-        local newR = (v - minVal) / (maxVal - minVal)
-        valueLabel.Text = tostring(v) .. "%"
-        knob.Position = UDim2.new(newR, 0, 0.5, 0)
-        settings[settingKey] = v
-        -- Example calculations for a vehicle controller in a game you own.
-        settings.topSpeedMultiplier = settings.topSpeed / 100
-        settings.accelerationMultiplier = settings.acceleration / 100
-        settings.handlingMultiplier = settings.handling / 100
-        note.Text = string.format("Preview values — Speed %.2fx, acceleration %.2fx, handling %.2fx. UI preview only; connect these settings to a vehicle controller in your own Roblox Studio game.", settings.topSpeedMultiplier or 1.5, settings.accelerationMultiplier or 0.75, settings.handlingMultiplier or 0.2)
-    end
-    hit.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            active = true
-            update(input.Position.X)
+    hit.MouseButton1Down:Connect(function() dragging = true; setFromX(UserInputService:GetMouseLocation().X) end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            setFromX(UserInputService:GetMouseLocation().X)
         end
     end)
-    UserInputService.InputChanged:Connect(function(input)
-        if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then update(input.Position.X) end
-    end)
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then active = false end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
+    return function() return current end
 end
 
-makeSlider("Top speed", "topSpeed", 63, 50, 300, 150, "50%", "150%", "300%")
-makeSlider("Acceleration", "acceleration", 163, 0, 200, 75, "0%", "100%", "200%")
-makeSlider("Handling", "handling", 263, 0, 100, 20, "0%", "50%", "100%")
+local getSpeed = makeSlider("Top Speed", 50, 300, 150, 0, "%")
+local getAccel = makeSlider("Acceleration", 0, 200, 75, 73, "%")
+local getHandling = makeSlider("Handling", 0, 100, 20, 146, "%")
 
-local note = Instance.new("TextLabel")
-note.Name = "PreviewNote"
-note.BackgroundTransparency = 1
-note.Position = UDim2.fromOffset(16, 361)
-note.Size = UDim2.new(1, -32, 0, 44)
-note.Font = Enum.Font.Gotham
-note.Text = "Preview values — Speed 1.50x, acceleration 0.75x, handling 0.20x. UI preview only; connect these settings to a vehicle controller in your own Roblox Studio game."
-note.TextSize = 12
-note.TextColor3 = white
-note.TextWrapped = true
-note.TextXAlignment = Enum.TextXAlignment.Left
-note.TextYAlignment = Enum.TextYAlignment.Top
-note.Parent = panel
+local footer = Instance.new("TextLabel", main)
+footer.BackgroundTransparency = 1
+footer.Position = UDim2.new(0, 16, 1, -23)
+footer.Size = UDim2.new(1, -32, 0, 14)
+footer.Font = Enum.Font.Gotham
+footer.Text = "UI PREVIEW  •  SLIDERS ARE NOT CONNECTED TO BIKE PHYSICS"
+footer.TextSize = 8
+footer.TextColor3 = muted
+footer.TextXAlignment = Enum.TextXAlignment.Left
 
--- Right Shift hides/shows the panel.
-UserInputService.InputBegan:Connect(function(input, processed)
-    if not processed and input.KeyCode == Enum.KeyCode.RightShift then panel.Visible = not panel.Visible end
+-- Drag window by its header.
+local draggingWindow, dragStart, startPos = false, nil, nil
+top.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingWindow = true
+        dragStart = input.Position
+        startPos = main.Position
+    end
 end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement and dragStart and startPos then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingWindow = false end
+end)
+
+local minimized = false
+UserInputService.InputBegan:Connect(function(input, processed)
+    if not processed and input.KeyCode == Enum.KeyCode.RightShift then
+        minimized = not minimized
+        body.Visible = not minimized
+        footer.Visible = not minimized
+        main.Size = minimized and UDim2.fromOffset(390, 54) or UDim2.fromOffset(390, 300)
+    end
+end)
+
+-- Keep values available for future integration with a vehicle controller you own.
+_G.AgentsWideOpenGetSliderValues = function()
+    return { topSpeedPercent = getSpeed(), accelerationPercent = getAccel(), handlingPercent = getHandling() }
+end
