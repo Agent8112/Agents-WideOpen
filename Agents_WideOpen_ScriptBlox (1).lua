@@ -494,6 +494,14 @@ for index, name in ipairs({"Home", "Performance", "Customization", "Noclip", "Se
     end))
 end
 
+
+-- Open Performance by default so the sliders are visible immediately.
+for name, b in pairs(navButtons) do
+    b.BackgroundColor3 = name == "Performance" and C.active or C.panel
+    b.BackgroundTransparency = name == "Performance" and 0 or 0.22
+end
+openPage("Performance")
+
 track(UserInputService.InputBegan:Connect(function(input, processed)
     if not processed and input.KeyCode == Enum.KeyCode.N and gui.Parent then
         noclipStatus = not noclipStatus
