@@ -136,31 +136,32 @@ header.BackgroundColor3 = Color3.fromRGB(31, 23, 48)
 header.BorderSizePixel = 0
 header.Parent = mainFrame
 
--- Drag the menu by holding and moving the header with the mouse.
+-- Drag the menu by holding the title bar (including the title text).
 local dragging = false
 local dragStart
 local startPosition
-local dragInput
 
-header.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPosition = mainFrame.Position
+local function beginDrag(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+		return
+	end
 
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragging = false
+	dragging = true
+	dragStart = input.Position
+	startPosition = mainFrame.Position
+
+	local endedConnection
+	endedConnection = UserInputService.InputEnded:Connect(function(endedInput)
+		if endedInput.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+			if endedConnection then
+				endedConnection:Disconnect()
 			end
-		end)
-	end
-end)
+		end
+	end)
+end
 
-header.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement then
-		dragInput = input
-	end
-end)
+header.InputBegan:Connect(beginDrag)
 
 local headerCorner = Instance.new("UICorner")
 headerCorner.CornerRadius = UDim.new(0, 12)
@@ -183,7 +184,9 @@ title.Text = "AGENTS WIDEOPEN"
 title.TextColor3 = Color3.fromRGB(239, 231, 255)
 title.TextSize = 13
 title.TextXAlignment = Enum.TextXAlignment.Left
+title.Active = true
 title.Parent = header
+title.InputBegan:Connect(beginDrag)
 
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Name = "MinimizeButton"
@@ -274,7 +277,7 @@ minimizeButton.Activated:Connect(function()
 end)
 
 local dragConnection = UserInputService.InputChanged:Connect(function(input)
-	if dragging and input == dragInput then
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
 		local delta = input.Position - dragStart
 		mainFrame.Position = UDim2.new(
 			startPosition.X.Scale,
