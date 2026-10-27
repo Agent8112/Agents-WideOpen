@@ -317,8 +317,9 @@ end)
 
 updateGui()
 
--- Restore state if the LocalScript is removed or the GUI is destroyed.
-script.Destroying:Connect(function()
+-- Restore state when the LocalScript is removed.
+-- A loadstring may not have a `script` object, so guard it before connecting.
+local function cleanup()
 	setNoclip(false)
 
 	if descendantAddedConnection then
@@ -336,4 +337,15 @@ script.Destroying:Connect(function()
 	if heartbeatConnection then
 		heartbeatConnection:Disconnect()
 	end
-end)
+end
+
+if typeof(script) == "Instance" then
+	local destroyingSignal = script:FindFirstChildWhichIsA("BindableEvent")
+	-- In Studio, use the Instance.Destroying signal when available.
+	local ok, signal = pcall(function()
+		return script.Destroying
+	end)
+	if ok and signal then
+		signal:Connect(cleanup)
+	end
+end
