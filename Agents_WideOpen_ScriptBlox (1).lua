@@ -20,7 +20,6 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local GUI_NAME = "AgentsWideopenGui"
 local noclipEnabled = false
-local doubleVehicleSpeedEnabled = false
 local menuMinimized = false
 local menuVisible = true
 
@@ -28,8 +27,6 @@ local character
 local descendantAddedConnection
 local characterAddedConnection
 local heartbeatConnection
-local speedSeat = nil
-local originalSeatMaxSpeed = nil
 
 -- Remember each part's original collision state so it can be restored.
 local originalCollision = {}
@@ -100,48 +97,6 @@ local function bindCharacter(newCharacter)
 	end
 end
 
--- Double the MaxSpeed of the VehicleSeat the local player is driving.
--- This is intended for vehicles in your own Studio experience. For a
--- multiplayer game, server-side vehicle code should authorize/apply upgrades.
-local function restoreVehicleSpeed()
-	if speedSeat and speedSeat.Parent and originalSeatMaxSpeed then
-		speedSeat.MaxSpeed = originalSeatMaxSpeed
-	end
-	speedSeat = nil
-	originalSeatMaxSpeed = nil
-end
-
-local function updateVehicleSpeed()
-	if not doubleVehicleSpeedEnabled then
-		restoreVehicleSpeed()
-		return
-	end
-
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	local seat = humanoid and humanoid.SeatPart
-
-	if not seat or not seat:IsA("VehicleSeat") then
-		restoreVehicleSpeed()
-		return
-	end
-
-	if seat ~= speedSeat then
-		restoreVehicleSpeed()
-		speedSeat = seat
-		originalSeatMaxSpeed = seat.MaxSpeed
-		seat.MaxSpeed = originalSeatMaxSpeed * 2
-	end
-end
-
-local function setDoubleVehicleSpeed(enabled)
-	doubleVehicleSpeedEnabled = enabled
-	if not enabled then
-		restoreVehicleSpeed()
-	else
-		updateVehicleSpeed()
-	end
-end
-
 -- Remove a previous copy if the script is rerun in Studio.
 local oldGui = playerGui:FindFirstChild(GUI_NAME)
 if oldGui then
@@ -157,9 +112,8 @@ screenGui.Parent = playerGui
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.fromOffset(250, 190)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.Size = UDim2.fromOffset(250, 145)
+mainFrame.Position = UDim2.new(0, 24, 0.42, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(19, 16, 29)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -180,33 +134,6 @@ header.Size = UDim2.new(1, 0, 0, 42)
 header.BackgroundColor3 = Color3.fromRGB(31, 23, 48)
 header.BorderSizePixel = 0
 header.Parent = mainFrame
-
--- Drag the menu by holding the title bar (including the title text).
-local dragging = false
-local dragStart
-local startPosition
-
-local function beginDrag(input)
-	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
-		return
-	end
-
-	dragging = true
-	dragStart = input.Position
-	startPosition = mainFrame.Position
-
-	local endedConnection
-	endedConnection = UserInputService.InputEnded:Connect(function(endedInput)
-		if endedInput.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-			if endedConnection then
-				endedConnection:Disconnect()
-			end
-		end
-	end)
-end
-
-header.InputBegan:Connect(beginDrag)
 
 local headerCorner = Instance.new("UICorner")
 headerCorner.CornerRadius = UDim.new(0, 12)
@@ -229,9 +156,7 @@ title.Text = "AGENTS WIDEOPEN"
 title.TextColor3 = Color3.fromRGB(239, 231, 255)
 title.TextSize = 13
 title.TextXAlignment = Enum.TextXAlignment.Left
-title.Active = true
 title.Parent = header
-title.InputBegan:Connect(beginDrag)
 
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Name = "MinimizeButton"
@@ -263,8 +188,8 @@ statusLabel.Parent = mainFrame
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleNoclip"
-toggleButton.Size = UDim2.new(1, -26, 0, 34)
-toggleButton.Position = UDim2.fromOffset(13, 82)
+toggleButton.Size = UDim2.new(1, -26, 0, 38)
+toggleButton.Position = UDim2.fromOffset(13, 83)
 toggleButton.BackgroundColor3 = Color3.fromRGB(91, 54, 145)
 toggleButton.BorderSizePixel = 0
 toggleButton.Font = Enum.Font.GothamBold
@@ -278,30 +203,13 @@ local toggleCorner = Instance.new("UICorner")
 toggleCorner.CornerRadius = UDim.new(0, 8)
 toggleCorner.Parent = toggleButton
 
-local vehicleSpeedButton = Instance.new("TextButton")
-vehicleSpeedButton.Name = "DoubleVehicleSpeed"
-vehicleSpeedButton.Size = UDim2.new(1, -26, 0, 34)
-vehicleSpeedButton.Position = UDim2.fromOffset(13, 122)
-vehicleSpeedButton.BackgroundColor3 = Color3.fromRGB(91, 54, 145)
-vehicleSpeedButton.BorderSizePixel = 0
-vehicleSpeedButton.Font = Enum.Font.GothamBold
-vehicleSpeedButton.Text = "2X VEHICLE SPEED: OFF"
-vehicleSpeedButton.TextColor3 = Color3.new(1, 1, 1)
-vehicleSpeedButton.TextSize = 11
-vehicleSpeedButton.AutoButtonColor = true
-vehicleSpeedButton.Parent = mainFrame
-
-local vehicleSpeedCorner = Instance.new("UICorner")
-vehicleSpeedCorner.CornerRadius = UDim.new(0, 8)
-vehicleSpeedCorner.Parent = vehicleSpeedButton
-
 local footer = Instance.new("TextLabel")
 footer.Name = "Footer"
 footer.Size = UDim2.new(1, -26, 0, 16)
-footer.Position = UDim2.fromOffset(13, 162)
+footer.Position = UDim2.fromOffset(13, 123)
 footer.BackgroundTransparency = 1
 footer.Font = Enum.Font.Gotham
-footer.Text = "Right Shift: menu  •  N: noclip"
+footer.Text = "Right Shift: menu  •  N: toggle"
 footer.TextColor3 = Color3.fromRGB(139, 127, 159)
 footer.TextSize = 9
 footer.TextXAlignment = Enum.TextXAlignment.Left
@@ -320,17 +228,10 @@ local function updateGui()
 		toggleButton.BackgroundColor3 = Color3.fromRGB(91, 54, 145)
 	end
 
-	statusLabel.Text = "Noclip: " .. (noclipEnabled and "ON" or "OFF")
-	vehicleSpeedButton.Text = doubleVehicleSpeedEnabled and "2X VEHICLE SPEED: ON" or "2X VEHICLE SPEED: OFF"
-	vehicleSpeedButton.BackgroundColor3 = doubleVehicleSpeedEnabled
-		and Color3.fromRGB(43, 111, 79)
-		or Color3.fromRGB(91, 54, 145)
-
 	statusLabel.Visible = not menuMinimized
 	toggleButton.Visible = not menuMinimized
-	vehicleSpeedButton.Visible = not menuMinimized
 	footer.Visible = not menuMinimized
-	mainFrame.Size = menuMinimized and UDim2.fromOffset(250, 42) or UDim2.fromOffset(250, 190)
+	mainFrame.Size = menuMinimized and UDim2.fromOffset(250, 42) or UDim2.fromOffset(250, 145)
 	screenGui.Enabled = menuVisible
 	minimizeButton.Text = menuMinimized and "+" or "−"
 end
@@ -340,26 +241,9 @@ toggleButton.Activated:Connect(function()
 	updateGui()
 end)
 
-vehicleSpeedButton.Activated:Connect(function()
-	setDoubleVehicleSpeed(not doubleVehicleSpeedEnabled)
-	updateGui()
-end)
-
 minimizeButton.Activated:Connect(function()
 	menuMinimized = not menuMinimized
 	updateGui()
-end)
-
-local dragConnection = UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		mainFrame.Position = UDim2.new(
-			startPosition.X.Scale,
-			startPosition.X.Offset + delta.X,
-			startPosition.Y.Scale,
-			startPosition.Y.Offset + delta.Y
-		)
-	end
 end)
 
 local inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -387,18 +271,13 @@ heartbeatConnection = RunService.Heartbeat:Connect(function()
 	if noclipEnabled then
 		applyNoclipToCharacter()
 	end
-	if doubleVehicleSpeedEnabled then
-		updateVehicleSpeed()
-	end
 end)
 
 updateGui()
 
--- Restore state when the LocalScript is removed.
--- A loadstring may not have a `script` object, so guard it before connecting.
-local function cleanup()
+-- Restore state if the LocalScript is removed or the GUI is destroyed.
+script.Destroying:Connect(function()
 	setNoclip(false)
-	setDoubleVehicleSpeed(false)
 
 	if descendantAddedConnection then
 		descendantAddedConnection:Disconnect()
@@ -409,21 +288,7 @@ local function cleanup()
 	if inputConnection then
 		inputConnection:Disconnect()
 	end
-	if dragConnection then
-		dragConnection:Disconnect()
-	end
 	if heartbeatConnection then
 		heartbeatConnection:Disconnect()
 	end
-end
-
-if typeof(script) == "Instance" then
-	local destroyingSignal = script:FindFirstChildWhichIsA("BindableEvent")
-	-- In Studio, use the Instance.Destroying signal when available.
-	local ok, signal = pcall(function()
-		return script.Destroying
-	end)
-	if ok and signal then
-		signal:Connect(cleanup)
-	end
-end
+end)
