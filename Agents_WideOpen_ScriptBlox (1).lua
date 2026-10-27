@@ -113,7 +113,8 @@ screenGui.Parent = playerGui
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.fromOffset(250, 145)
-mainFrame.Position = UDim2.new(0, 24, 0.42, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(19, 16, 29)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -134,6 +135,32 @@ header.Size = UDim2.new(1, 0, 0, 42)
 header.BackgroundColor3 = Color3.fromRGB(31, 23, 48)
 header.BorderSizePixel = 0
 header.Parent = mainFrame
+
+-- Drag the menu by holding and moving the header with the mouse.
+local dragging = false
+local dragStart
+local startPosition
+local dragInput
+
+header.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPosition = mainFrame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+header.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
 
 local headerCorner = Instance.new("UICorner")
 headerCorner.CornerRadius = UDim.new(0, 12)
@@ -246,6 +273,18 @@ minimizeButton.Activated:Connect(function()
 	updateGui()
 end)
 
+local dragConnection = UserInputService.InputChanged:Connect(function(input)
+	if dragging and input == dragInput then
+		local delta = input.Position - dragStart
+		mainFrame.Position = UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+	end
+end)
+
 local inputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
@@ -287,6 +326,9 @@ script.Destroying:Connect(function()
 	end
 	if inputConnection then
 		inputConnection:Disconnect()
+	end
+	if dragConnection then
+		dragConnection:Disconnect()
 	end
 	if heartbeatConnection then
 		heartbeatConnection:Disconnect()
